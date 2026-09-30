@@ -5,8 +5,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { phoneNumber } from "better-auth/plugins/phone-number";
 import { account, db, session, user, verification } from "@db";
 import { betterAuthBaseURL } from "@shared/environment/origin";
-import { env, localPhoneAuthBypassEnabled } from "@shared/environment";
+import { env, localSignInEnabled } from "@shared/environment";
 import { getInstallationSecrets } from "@db/services/installation-secrets";
+import { getLocalSignInCode, verifyLocalSignInCode } from "./local-code";
+import { localAccountPhoneNumber } from "@shared/identity/local-auth";
 import { LinqDeliveryError, linqOtpFailure, sendLinqText } from "./linq";
 import { isE164PhoneNumber } from "@shared/identity/phone-number";
 
@@ -28,6 +30,7 @@ async function initializeAuthWithRetry() {
 
 async function initializeAuth() {
   const { betterAuthSecret } = await getInstallationSecrets();
+  if (localSignInEnabled) await getLocalSignInCode();
   return betterAuth({
     appName: "Local Vault Assistant",
     baseURL: betterAuthBaseURL(),
@@ -50,9 +53,12 @@ async function initializeAuth() {
       phoneNumber({
         allowedAttempts: 3,
         expiresIn: 300,
-        phoneNumberValidator: isE164PhoneNumber,
+        phoneNumberValidator: (value) =>
+          localSignInEnabled
+            ? value === localAccountPhoneNumber
+            : isE164PhoneNumber(value),
         requireVerification: true,
-        sendOTP: localPhoneAuthBypassEnabled
+        sendOTP: localSignInEnabled
           ? () => undefined
           : ({ code, phoneNumber: to }) => sendPhoneCode({ code, to }),
         signUpOnVerification: {
@@ -62,8 +68,9 @@ async function initializeAuth() {
               .digest("hex")}@local-vault.invalid`,
           getTempName: () => "Phone user",
         },
-        verifyOTP: localPhoneAuthBypassEnabled
-          ? ({ phoneNumber: value }) => isE164PhoneNumber(value)
+        verifyOTP: localSignInEnabled
+          ? ({ phoneNumber: value, code }) =>
+              value === localAccountPhoneNumber && verifyLocalSignInCode(code)
           : undefined,
       }),
     ],

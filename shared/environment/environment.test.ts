@@ -48,15 +48,14 @@ describe("environment", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("VERCEL_ENV", undefined);
 
-    const { env, localPhoneAuthBypassEnabled } =
-      await import("@shared/environment");
+    const { env, localSignInEnabled } = await import("@shared/environment");
 
     expect(env).toMatchObject({
       BETTER_AUTH_SECRET: "openinstinct-local-auth-development-secret",
       BETTER_AUTH_URL: "http://localhost:3000",
       SECRET_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     });
-    expect(localPhoneAuthBypassEnabled).toBe(true);
+    expect(localSignInEnabled).toBe(true);
   });
 
   it.each([
@@ -103,7 +102,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBeUndefined();
   });
 
-  it.each(["DATABASE_URL", "KERNEL_API_KEY"])(
+  it.each(["DATABASE_URL"])(
     "keeps %s required in local development",
     async (name) => {
       vi.stubEnv(name, "");
@@ -126,10 +125,7 @@ describe("environment", () => {
     expect(env.SECRET_ENCRYPTION_KEY).toBe(key);
   });
 
-  it.each([
-    ["DATABASE_URL", "Invalid environment variables"],
-    ["KERNEL_API_KEY", "Invalid environment variables"],
-  ])(
+  it.each([["DATABASE_URL", "Invalid environment variables"]])(
     "rejects a missing required %s value during import",
     async (name, errorMessage) => {
       vi.stubEnv(name, "");
@@ -186,20 +182,19 @@ describe("environment", () => {
   it.each([
     ["http://localhost:3000", "development", undefined, true],
     ["https://openinstinct.localhost", "development", undefined, true],
-    ["http://localhost:3000", "production", undefined, false],
+    ["http://localhost:3000", "production", undefined, true],
     ["http://localhost:3000", "development", "development", false],
     ["https://preview.example.com", "development", undefined, false],
   ] as const)(
-    "resolves local phone auth bypass for %s in %s",
+    "resolves local sign-in for %s in %s",
     async (url, nodeEnv, vercelEnv, expected) => {
       vi.stubEnv("BETTER_AUTH_URL", url);
       vi.stubEnv("NODE_ENV", nodeEnv);
       vi.stubEnv("VERCEL_ENV", vercelEnv);
 
-      const { localPhoneAuthBypassEnabled } =
-        await import("@shared/environment");
+      const { localSignInEnabled } = await import("@shared/environment");
 
-      expect(localPhoneAuthBypassEnabled).toBe(expected);
+      expect(localSignInEnabled).toBe(expected);
     }
   );
 });

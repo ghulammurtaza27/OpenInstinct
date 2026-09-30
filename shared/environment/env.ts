@@ -63,7 +63,7 @@ export const env = createEnv({
   server: {
     // Required
     DATABASE_URL: databaseUrlSchema,
-    KERNEL_API_KEY: requiredValue,
+    KERNEL_API_KEY: requiredValue.optional(),
     LOCAL_MODEL_BASE_URL: requiredValue
       .refine((value) => URL.canParse(value), "Must be an absolute URL")
       .default("http://127.0.0.1:11434/v1"),
@@ -121,8 +121,8 @@ const authHostname = env.BETTER_AUTH_URL
   ? new URL(env.BETTER_AUTH_URL).hostname
   : undefined;
 
-export const localPhoneAuthBypassEnabled =
-  localDevelopment &&
+export const localSignInEnabled =
+  process.env.VERCEL_ENV === undefined &&
   (authHostname === "localhost" ||
     authHostname?.endsWith(".localhost") === true ||
     authHostname === "127.0.0.1" ||

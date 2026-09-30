@@ -3,10 +3,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { formValue, verifyPhoneNumber } from "@app/sign-in/_lib/phone-auth";
-import { normalizeAuthPhoneNumber } from "@shared/identity/phone-number";
+import { localAccountPhoneNumber } from "@shared/identity/local-auth";
 import { Button } from "@web/components/ui/button";
 import { FieldError, FieldGroup } from "@web/components/ui/field";
-import { PhoneNumberField } from "./phone-field";
+import { Field, FieldLabel } from "@web/components/ui/field";
+import { Input } from "@web/components/ui/input";
 
 export function LocalPhoneAuthForm({
   callbackUrl,
@@ -15,14 +16,11 @@ export function LocalPhoneAuthForm({
 }) {
   const router = useRouter();
   const signIn = useMutation({
-    mutationFn: async (phoneNumberValue: string) => {
-      const phoneNumber = normalizeAuthPhoneNumber(phoneNumberValue);
-      if (!phoneNumber) throw new Error("Enter a valid phone number.");
-
+    mutationFn: async (code: string) => {
       await verifyPhoneNumber({
-        code: "000000",
-        errorMessage: "Unable to sign in locally. Please try again.",
-        phoneNumber,
+        code,
+        errorMessage: "Invalid local access code.",
+        phoneNumber: localAccountPhoneNumber,
       });
     },
     onSuccess: () => {
@@ -36,11 +34,23 @@ export function LocalPhoneAuthForm({
       className="mt-6"
       onSubmit={(event) => {
         event.preventDefault();
-        signIn.mutate(formValue(event.currentTarget, "phone-number"));
+        signIn.mutate(formValue(event.currentTarget, "access-code"));
       }}
     >
       <FieldGroup>
-        <PhoneNumberField />
+        <Field>
+          <FieldLabel htmlFor="access-code">Local access code</FieldLabel>
+          <Input
+            autoComplete="off"
+            id="access-code"
+            inputMode="numeric"
+            name="access-code"
+            pattern="[0-9]{12}"
+            required
+            size="xl"
+            type="password"
+          />
+        </Field>
         <FieldError errors={signIn.error ? [signIn.error] : undefined} />
         <Button
           className="w-full"

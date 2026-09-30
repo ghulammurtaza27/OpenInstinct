@@ -11,20 +11,19 @@
 This branch is configured for Ghulam's local AI computer. It does not deploy the
 application or model inference to Vercel.
 
-| Part                   | Where it runs                                             |
-| ---------------------- | --------------------------------------------------------- |
-| Main agent model       | Local ODS `llama-server`                                  |
-| Browser decision model | The same local Qwen model                                 |
-| PostgreSQL             | Local Docker Compose                                      |
-| Profile memory         | Local filesystem data directory with private permissions  |
-| Browser images         | Local filesystem data directory                           |
-| Web UI                 | This computer; optionally exposed over Tailscale          |
-| Browser execution      | Kernel cloud browser (current remaining external service) |
+| Part                   | Where it runs                                            |
+| ---------------------- | -------------------------------------------------------- |
+| Main agent model       | Local ODS `llama-server`                                 |
+| Browser decision model | The same local Qwen model                                |
+| PostgreSQL             | Local Docker Compose                                     |
+| Profile memory         | Local filesystem data directory with private permissions |
+| Browser images         | Local filesystem data directory                          |
+| Web UI                 | This computer; optionally exposed over Tailscale         |
+| Browser execution      | Unavailable until a local Chrome runner is installed     |
 
-The important distinction is that Qwen decides what to do in the browser, but
-Kernel currently hosts the browser session itself. Browser page content and
-actions therefore pass through Kernel. Replacing Kernel with a local Chromium
-runner is a separate project if fully local browser execution is required.
+This installation can chat with local Qwen without a browser key. Browser automation is currently disabled.
+The upstream browser tools use Kernel cloud;
+they need a local Chrome replacement before private browser tasks can run.
 
 OpenTelemetry export is disabled. The ordinary development, build, test, and
 start commands also disable Next.js and Turbo anonymous telemetry.
@@ -36,7 +35,6 @@ start commands also disable Next.js and Turbo anonymous telemetry.
 - Node.js 24
 - pnpm 11.24.0 through Corepack
 - Docker with Compose
-- A Kernel API key while the existing browser runtime is retained
 
 ## Configure
 
@@ -44,8 +42,7 @@ start commands also disable Next.js and Turbo anonymous telemetry.
 cp .env.example .env.local
 ```
 
-Set `KERNEL_API_KEY` in `.env.local`. These defaults already target the model
-currently loaded in ODS:
+These defaults already target the model currently loaded in ODS:
 
 ```dotenv
 LOCAL_MODEL_BASE_URL=http://127.0.0.1:11434/v1
@@ -78,6 +75,17 @@ Open `http://127.0.0.1:3100`. OpenInstinct deliberately uses port 3100 so it
 does not collide with another app on port 3000. To use it from your phone, expose only
 that local web app through Tailscale, as with Pi Phone. Do not open the port to
 the public internet.
+
+Local sign-in uses a private 12-digit access code generated on this computer.
+The sign-in page does not send a text or connect to Vercel. Read the code in
+your terminal with:
+
+```bash
+sed -n '1p' data/local-openinstinct/sign-in-code
+```
+
+Keep this file private; it grants access to the local account. The file is
+created when the sign-in page is first opened and remains stable across restarts.
 
 ## Local data
 

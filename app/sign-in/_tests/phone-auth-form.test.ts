@@ -81,6 +81,8 @@ describe("phone OTP errors", () => {
     );
 
     expect(html).not.toContain("First time signing in?");
+    expect(html).toContain("Local access code");
+    expect(html).not.toContain("Phone Number");
     expect(html).toContain("Continue");
   });
 });

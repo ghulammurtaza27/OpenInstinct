@@ -53,7 +53,7 @@ describe("Turbo configuration", () => {
     );
     expect(readme).toContain("Local ODS `llama-server`");
     expect(readme).toContain("The same local Qwen model");
-    expect(readme).toContain("Kernel cloud browser");
+    expect(readme).toContain("Browser automation is currently disabled");
     expect(readme).toContain("OpenTelemetry export is disabled");
     expect(readme).not.toContain("vercel.com/new/clone");
   });
