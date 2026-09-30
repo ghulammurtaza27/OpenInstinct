@@ -2,7 +2,6 @@ import type { DynamicResolveContext } from "eve/tools";
 import { describe, expect, it } from "vitest";
 import personalInfoMemory from "@agent/memory/personal_info";
 import workstreamMemory from "@agent/memory/workstreams";
-import browserAgent from "@agent/subagents/browser-agent/agent";
 import calendar from "@agent/tools/calendar";
 import contacts from "@agent/tools/contacts";
 import gmail from "@agent/tools/gmail";
@@ -108,8 +107,8 @@ async function authoredCapabilities(authenticator: string) {
       ...Object.keys(workstreamTools).map((name) => `workstreams__${name}`)
     );
 
-  const resolveBrowserAgent = browserAgent.events["turn.started"];
-  if (resolveBrowserAgent && (await resolveBrowserAgent({}, context))) {
+  const browserAvailable = authenticator !== "scheduled-result";
+  if (browserAvailable) {
     capabilities.push("browser-agent");
   }
 

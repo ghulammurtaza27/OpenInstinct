@@ -1,4 +1,5 @@
 node_modules
+.pnpm-store
 .env*
 !.env.example
 .eve
@@ -10,5 +11,6 @@ next-env.d.ts
 .wxt
 .nitro
 dist
+data/local-openinstinct
 .DS_Store
 *.tsbuildinfo

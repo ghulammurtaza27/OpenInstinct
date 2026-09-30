@@ -1,6 +1,3 @@
-import { otel } from "eve/instrumentation/otel";
+import { disableInstrumentation } from "eve/instrumentation";
 
-export default otel({
-  traceChannelRequests: true,
-  tracePolicy: () => ({ emit: true, recordInputs: true, recordOutputs: true }),
-});
+export default disableInstrumentation();

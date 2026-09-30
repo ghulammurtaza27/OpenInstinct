@@ -34,7 +34,7 @@ describe("local development", supervisorTestOptions, () => {
       .parse(JSON.parse(packageManifestSource));
 
     expect(packageManifest.scripts.dev).toBe(
-      "node --env-file-if-exists=.env.local scripts/dev.ts"
+      "NEXT_TELEMETRY_DISABLED=1 TURBO_TELEMETRY_DISABLED=1 node --env-file-if-exists=.env.local scripts/dev.ts"
     );
     expect(compose).toContain("image: postgres:17-alpine");
     expect(compose).toContain('"127.0.0.1::5432"');
@@ -61,6 +61,11 @@ describe("local development", supervisorTestOptions, () => {
     expect(developmentScript).toContain(
       "DATABASE_URL_UNPOOLED: localDatabaseUrl"
     );
+    expect(developmentScript).toContain(
+      'nonEmpty(inheritedEnvironment.OPENINSTINCT_PORT) ?? "3100"'
+    );
+    expect(developmentScript).toContain("PORT: webPort");
+    expect(developmentScript).toContain("`http://127.0.0.1:${webPort}`");
   });
 
   it("tears Compose down when interrupted during startup", async () => {
@@ -76,15 +81,10 @@ describe("local development", supervisorTestOptions, () => {
     expect(result.code).toBe(1);
     expect(result.commands).toBe("");
     expect(result.stderr).toContain(
-      "KERNEL_API_KEY is required for manual local development."
+      "KERNEL_API_KEY is required while this fork uses Kernel for browser execution."
     );
-    expect(result.stderr).toContain(
-      "Deploy with Vercel button in README.md; its Kernel Marketplace integration supplies the credentials automatically."
-    );
-    expect(result.stderr).toContain(
-      "pnpm exec vercel integration add kernel --plan FREE"
-    );
-    expect(result.stderr).toContain("create a key at https://kernel.sh");
+    expect(result.stderr).toContain("local Qwen endpoint");
+    expect(result.stderr).toContain("Create a key at https://kernel.sh");
   });
 
   it("does not advance when interrupted startup exits cleanly", async () => {
@@ -123,8 +123,8 @@ describe("local development", supervisorTestOptions, () => {
     expect(lines).toEqual([
       `compose --project-name ${project} up --detach --wait`,
       `compose --project-name ${project} port postgres 5432`,
-      "pnpm db:migrate postgresql://postgres:postgres@127.0.0.1:49152/open_instinct",
-      "pnpm dev:app postgresql://postgres:postgres@127.0.0.1:49152/open_instinct",
+      "pnpm db:migrate postgresql://postgres:postgres@127.0.0.1:49152/open_instinct 3100 http://127.0.0.1:3100",
+      "pnpm dev:app postgresql://postgres:postgres@127.0.0.1:49152/open_instinct 3100 http://127.0.0.1:3100",
       `compose --project-name ${project} down`,
     ]);
   });
@@ -232,7 +232,7 @@ fi
     writeFile(
       pnpmPath,
       `#!/bin/sh
-printf 'pnpm %s %s\n' "$*" "$DATABASE_URL" >> "$DEV_SUPERVISOR_LOG"
+printf 'pnpm %s %s %s %s\n' "$*" "$DATABASE_URL" "$PORT" "$BETTER_AUTH_URL" >> "$DEV_SUPERVISOR_LOG"
 `
     ),
   ]);

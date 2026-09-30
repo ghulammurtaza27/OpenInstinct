@@ -40,6 +40,7 @@ describe("source layout", () => {
       "environment",
       "google-workspace",
       "identity",
+      "local-storage",
       "schedules",
       "user-profile",
       "vault",

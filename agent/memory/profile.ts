@@ -1,20 +1,14 @@
 import { defineMemory } from "eve/memory";
 import { fileMemory } from "eve/memory/file";
-import { vercelBlob } from "eve/memory/file/vercel";
 import {
   preserveProfileMemoryCancellation,
-  resolveProfileMemoryBackend,
   resolveProfileMemoryScope,
 } from "../lib/profile-memory";
 import { env } from "@shared/environment";
+import { localMemoryBackend } from "@agent/lib/local-memory-backend";
 
-const backend = resolveProfileMemoryBackend(env);
 const provider = preserveProfileMemoryCancellation(
-  backend.kind === "vercel-blob"
-    ? fileMemory({
-        backend: vercelBlob(backend.options),
-      })
-    : fileMemory()
+  fileMemory({ backend: localMemoryBackend(env.LOCAL_DATA_DIR) })
 );
 
 export default defineMemory({

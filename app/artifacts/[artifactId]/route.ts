@@ -1,9 +1,8 @@
-import { get } from "@vercel/blob";
 import { z } from "zod";
 import { getAuthSession } from "@db/services/auth/session";
 import { readReadyBrowserImageArtifact } from "@db/services/browser-images";
 import { accessScopeForUser } from "@shared/identity/access-scope";
-import { env } from "@shared/environment";
+import { readLocalArtifact } from "@shared/local-storage/artifacts";
 
 export const runtime = "nodejs";
 
@@ -16,15 +15,13 @@ export async function GET(
   if (!session || !parsedId.success) return notFound();
 
   const scope = accessScopeForUser(`better-auth:${session.user.id}`);
-  const opened = await openArtifact(scope, parsedId.data, {
-    ifNoneMatch: request.headers.get("if-none-match") ?? undefined,
-    signal: request.signal,
-  });
+  const opened = await openArtifact(scope, parsedId.data, request.signal);
   if (!opened) return notFound();
 
   const headers = privateImageHeaders();
-  headers.set("etag", opened.result.blob.etag);
-  if (opened.result.statusCode === 304) {
+  const etag = `"${opened.artifact.contentHash}"`;
+  headers.set("etag", etag);
+  if (request.headers.get("if-none-match") === etag) {
     return new Response(null, { headers, status: 304 });
   }
 
@@ -34,32 +31,30 @@ export async function GET(
     "content-disposition",
     contentDisposition(opened.artifact.filename)
   );
-  return new Response(opened.result.stream, { headers, status: 200 });
+  return new Response(opened.bytes, { headers, status: 200 });
 }
 
 async function openArtifact(
   scope: ReturnType<typeof accessScopeForUser>,
   artifactId: string,
-  options: { readonly ifNoneMatch?: string; readonly signal?: AbortSignal }
+  signal?: AbortSignal
 ) {
   const artifact = await readReadyBrowserImageArtifact(scope, artifactId);
   const byteSize = artifact?.byteSize;
   const filename = artifact?.filename;
   const mediaType = artifact?.mediaType;
-  if (!artifact || !byteSize || !filename || !mediaType) return undefined;
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) return undefined;
-  const result = await get(artifact.storagePathname, {
-    access: "private",
-    abortSignal: options.signal,
-    ifNoneMatch: options.ifNoneMatch,
-  });
-  if (!result) return undefined;
-  if (
-    result.statusCode === 200 &&
-    (result.blob.size !== byteSize || result.blob.contentType !== mediaType)
-  )
+  const contentHash = artifact?.contentHash;
+  if (!artifact || !byteSize || !filename || !mediaType || !contentHash)
     return undefined;
-  return { artifact: { ...artifact, byteSize, filename, mediaType }, result };
+  signal?.throwIfAborted();
+  const bytes = await readLocalArtifact(artifact.storagePathname).catch(
+    () => undefined
+  );
+  if (!bytes || bytes.byteLength !== byteSize) return undefined;
+  return {
+    artifact: { ...artifact, byteSize, contentHash, filename, mediaType },
+    bytes,
+  };
 }
 
 function notFound() {

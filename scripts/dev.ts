@@ -16,13 +16,26 @@ const composeArguments = (...args: string[]) => [
 
 // oxlint-disable-next-line eslint/no-restricted-properties -- the development supervisor must forward the caller's environment to its child processes
 const inheritedEnvironment = { ...process.env };
+const nonEmpty = (value: string | undefined) => {
+  const normalized = value?.trim();
+  return normalized === "" ? undefined : normalized;
+};
+const webPort = nonEmpty(inheritedEnvironment.OPENINSTINCT_PORT) ?? "3100";
 
-function developmentEnvironment(port: string) {
-  const localDatabaseUrl = `postgresql://postgres:postgres@127.0.0.1:${port}/open_instinct`;
+if (!/^\d+$/.test(webPort) || Number(webPort) < 1 || Number(webPort) > 65_535) {
+  throw new Error("OPENINSTINCT_PORT must be a valid TCP port.");
+}
+
+function developmentEnvironment(databasePort: string) {
+  const localDatabaseUrl = `postgresql://postgres:postgres@127.0.0.1:${databasePort}/open_instinct`;
   return {
     ...inheritedEnvironment,
+    BETTER_AUTH_URL:
+      nonEmpty(inheritedEnvironment.BETTER_AUTH_URL) ??
+      `http://127.0.0.1:${webPort}`,
     DATABASE_URL: localDatabaseUrl,
     DATABASE_URL_UNPOOLED: localDatabaseUrl,
+    PORT: webPort,
   };
 }
 
@@ -159,10 +172,9 @@ function requireKernelApiKey() {
 
   throw new Error(
     [
-      "KERNEL_API_KEY is required for manual local development.",
-      "For the simplest setup, use the Deploy with Vercel button in README.md; its Kernel Marketplace integration supplies the credentials automatically.",
-      "For an existing linked Vercel project, run pnpm exec vercel integration add kernel --plan FREE.",
-      "Otherwise create a key at https://kernel.sh, set KERNEL_API_KEY in .env.local, and run pnpm dev again.",
+      "KERNEL_API_KEY is required while this fork uses Kernel for browser execution.",
+      "Create a key at https://kernel.sh, set KERNEL_API_KEY in .env.local, and run pnpm dev again.",
+      "The main agent and browser decision model still run on your local Qwen endpoint.",
     ].join("\n")
   );
 }

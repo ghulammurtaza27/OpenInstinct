@@ -43,7 +43,6 @@ describe("database services", () => {
       chats,
       secrets,
       sessions,
-      settings,
       scope,
       vault,
     ] = await Promise.all([
@@ -53,7 +52,6 @@ describe("database services", () => {
       import("@db/services/chats"),
       import("@db/services/secrets"),
       import("@db/services/sessions"),
-      import("@db/services/settings"),
       import("@db/services/scope"),
       import("@db/services/vault"),
     ]);
@@ -336,10 +334,6 @@ describe("database services", () => {
     expect(await secrets.readEncryptedSecret(bob, sharedSecretId)).toBe(
       "ciphertext-bob"
     );
-
-    await settings.selectGatewayModel(alice, "openai/test");
-    expect(await settings.getGatewayModel(alice)).toBe("openai/test");
-    expect(await settings.getGatewayModel(bob)).toBe("openai/gpt-5.6-sol-fast");
   }, 15_000);
 });
 

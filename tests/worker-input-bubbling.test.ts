@@ -1,22 +1,7 @@
-import type * as RuntimeSubagentConfig from "../node_modules/eve/dist/src/runtime/subagents/dynamic-agent-config.js";
-import type * as RuntimeContext from "../node_modules/eve/dist/src/context/container.js";
+import type { DynamicResolveContext } from "eve";
 import { existsSync, readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import browserAgent from "@agent/subagents/browser-agent/agent";
-
-// Use the same normalization boundary as real delegation; calling the authored
-// resolver alone does not validate which fields Eve accepts at runtime.
-const { normalizeDynamicSubagentAgentConfig } = await vi.importActual<
-  typeof RuntimeSubagentConfig
->(
-  new URL(
-    "./runtime/subagents/dynamic-agent-config.js",
-    import.meta.resolve("eve")
-  ).pathname
-);
-const { ContextContainer } = await vi.importActual<typeof RuntimeContext>(
-  new URL("./context/container.js", import.meta.resolve("eve")).pathname
-);
 
 describe("worker input bubbling", () => {
   it("keeps native questions disabled inside browser workers", () => {
@@ -25,26 +10,23 @@ describe("worker input bubbling", () => {
     ).toBe(false);
   });
 
-  it("accepts the selected browser worker through Eve's runtime normalization", async () => {
-    const worker = await browserAgent.events["turn.started"]?.(
-      {},
-      {
-        model: null,
-        channel: { kind: "channel:linq", metadata: {} },
-        messages: [],
-        session: {
-          auth: { current: null, initiator: null },
-          id: "worker-test",
-        },
-      }
-    );
-    await expect(
-      normalizeDynamicSubagentAgentConfig({
-        name: "browser-agent",
-        value: worker,
-        state: new ContextContainer(),
-      })
-    ).resolves.toMatchObject({ model: { id: "meta/muse-spark-1.3" } });
+  it("selects the local model for every browser worker model step", async () => {
+    const selection = await browserAgent.model.events["step.started"]?.({}, {
+      channel: { kind: "http" },
+      messages: [],
+      model: null,
+      session: {
+        auth: { current: null, initiator: null },
+        id: "browser-worker-test",
+      },
+    } satisfies DynamicResolveContext);
+    expect(selection).toMatchObject({
+      modelContextWindowTokens: 65_536,
+      reasoning: "low",
+    });
+    expect(selection?.model).toMatchObject({
+      modelId: "/models/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf",
+    });
   });
 
   it("ends the worker turn and routes the answer through its agent id", () => {

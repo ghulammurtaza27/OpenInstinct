@@ -238,7 +238,6 @@ describe("migration deployment policy", () => {
         "scope",
         "secrets",
         "sessions",
-        "settings",
         "vault",
       ].map(
         async (name) =>

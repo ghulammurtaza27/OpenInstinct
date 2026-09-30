@@ -1,5 +1,6 @@
-import { createHash, randomBytes } from "node:crypto";
-import { get, put } from "@vercel/blob";
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 import {
   betterAuthSecretSchema,
@@ -13,19 +14,14 @@ const installationSecretsSchema = z.object({
   version: z.literal(1),
 });
 
-export type InstallationSecrets = z.infer<typeof installationSecretsSchema>;
+type InstallationSecrets = z.infer<typeof installationSecretsSchema>;
 
-const maximumInstallationSecretsBytes = 1024;
 let installationSecretsPromise: Promise<InstallationSecrets> | undefined;
 
-export function getInstallationSecrets() {
-  installationSecretsPromise ??= resolveInstallationSecretsWithRetry();
-  return installationSecretsPromise;
-}
-
-async function resolveInstallationSecretsWithRetry() {
+export async function getInstallationSecrets() {
+  installationSecretsPromise ??= resolveInstallationSecrets();
   try {
-    return await resolveInstallationSecrets();
+    return await installationSecretsPromise;
   } catch (error) {
     installationSecretsPromise = undefined;
     throw error;
@@ -36,13 +32,11 @@ async function resolveInstallationSecrets() {
   const configured = configuredInstallationSecrets();
   if (configured) return configured;
 
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "Installation secrets are unavailable. Connect a private Vercel Blob store or set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY."
-    );
-  }
-  const pathname = installationSecretsPathname();
-  const existing = await readInstallationSecrets(pathname);
+  const filename = path.resolve(
+    env.LOCAL_DATA_DIR,
+    "installation-secrets.v1.json"
+  );
+  const existing = await readInstallationSecrets(filename);
   if (existing) return existing;
 
   const generated = installationSecretsSchema.parse({
@@ -50,18 +44,17 @@ async function resolveInstallationSecrets() {
     secretEncryptionKey: randomBytes(32).toString("base64"),
     version: 1,
   });
+  await mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
   try {
-    await put(pathname, JSON.stringify(generated), {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      cacheControlMaxAge: 365 * 24 * 60 * 60,
-      contentType: "application/json",
-      maximumSizeInBytes: maximumInstallationSecretsBytes,
+    await writeFile(filename, JSON.stringify(generated), {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
     });
     return generated;
   } catch (error) {
-    const winner = await readInstallationSecrets(pathname);
+    if (!isExistingFile(error)) throw error;
+    const winner = await readInstallationSecrets(filename);
     if (winner) return winner;
     throw error;
   }
@@ -73,7 +66,7 @@ function configuredInstallationSecrets() {
   if (!betterAuthSecret && !secretEncryptionKey) return undefined;
   if (!betterAuthSecret || !secretEncryptionKey) {
     throw new Error(
-      "Set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY, or leave both unset for automatic private Blob provisioning."
+      "Set both BETTER_AUTH_SECRET and SECRET_ENCRYPTION_KEY, or leave both unset for automatic local provisioning."
     );
   }
   return installationSecretsSchema.parse({
@@ -83,26 +76,20 @@ function configuredInstallationSecrets() {
   });
 }
 
-async function readInstallationSecrets(pathname: string) {
-  const result = await get(pathname, {
-    access: "private",
-    useCache: false,
-  });
-  if (!result) return undefined;
-  if (result.statusCode !== 200) {
-    throw new Error("The installation secrets Blob returned no content.");
+async function readInstallationSecrets(filename: string) {
+  try {
+    const value: unknown = JSON.parse(await readFile(filename, "utf8"));
+    return installationSecretsSchema.parse(value);
+  } catch (error) {
+    if (isMissingFile(error)) return undefined;
+    throw error;
   }
-  if (result.blob.size > maximumInstallationSecretsBytes) {
-    throw new Error("The installation secrets Blob is unexpectedly large.");
-  }
-  const value: unknown = await new Response(result.stream).json();
-  return installationSecretsSchema.parse(value);
 }
 
-function installationSecretsPathname() {
-  const scope = createHash("sha256")
-    .update(env.VERCEL_PROJECT_ID ?? "standalone")
-    .digest("hex")
-    .slice(0, 32);
-  return `openinstinct/system/${scope}/installation-secrets.v1.json`;
+function isExistingFile(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "EEXIST";
+}
+
+function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

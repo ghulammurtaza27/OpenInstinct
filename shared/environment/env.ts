@@ -64,6 +64,18 @@ export const env = createEnv({
     // Required
     DATABASE_URL: databaseUrlSchema,
     KERNEL_API_KEY: requiredValue,
+    LOCAL_MODEL_BASE_URL: requiredValue
+      .refine((value) => URL.canParse(value), "Must be an absolute URL")
+      .default("http://127.0.0.1:11434/v1"),
+    LOCAL_MODEL_ID: requiredValue.default(
+      "/models/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+    ),
+    LOCAL_MODEL_CONTEXT_TOKENS: z.coerce
+      .number()
+      .int()
+      .min(8_192)
+      .default(65_536),
+    LOCAL_DATA_DIR: requiredValue.default("./data/local-openinstinct"),
 
     // Optional overrides with local defaults. Vercel deployments provision
     // installation secrets in their connected private Blob store.
@@ -91,6 +103,7 @@ export const env = createEnv({
         "LINQ_PHONE_NUMBER must use E.164 format"
       )
       .optional(),
+    LOCAL_MODEL_API_KEY: requiredValue.optional(),
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("production"),

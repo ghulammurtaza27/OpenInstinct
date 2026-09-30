@@ -9,6 +9,7 @@ const applicationEnvironment = [
   "*_CONNECTOR_UID",
   "KERNEL_*",
   "LINQ_*",
+  "LOCAL_*",
   "NODE_ENV",
   "SECRET_ENCRYPTION_KEY",
   "VERCEL_*",
@@ -45,66 +46,15 @@ describe("Turbo configuration", () => {
     expect(turbo.tasks["start:app"].passThroughEnv).toEqual(runtimeEnvironment);
   });
 
-  it("provisions required one-click deployment configuration", async () => {
+  it("documents the private local deployment configuration", async () => {
     const readme = await readFile(
       new URL("../README.md", import.meta.url),
       "utf8"
     );
-    const deployButtons = [
-      ...readme.matchAll(
-        /\[!\[Deploy with Vercel(?: and Linq)?\]\([^)]+\)\]\((https:\/\/vercel\.com\/new\/clone\?[^)]+)\)/gu
-      ),
-    ].map((match) => new URL(z.url().parse(match[1])));
-    expect(deployButtons).toHaveLength(1);
-    const [deployButton] = deployButtons;
-    expect(deployButton).toBeDefined();
-    const blobSetup = readme
-      .split("### Blob storage", 2)[1]
-      ?.split("### Linq iMessage setup", 1)[0];
-
-    expect(deployButton?.searchParams.get("repository-url")).toBe(
-      "https://github.com/Merit-Systems/OpenInstinct"
-    );
-    expect(deployButton?.searchParams.has("env")).toBe(false);
-    expect(deployButton?.searchParams.has("products")).toBe(false);
-    expect(
-      JSON.parse(deployButton?.searchParams.get("stores") ?? "null")
-    ).toEqual([
-      {
-        integrationSlug: "kernel",
-        productSlug: "kernel",
-        protocol: "other",
-        type: "integration",
-      },
-      {
-        integrationSlug: "neon",
-        productSlug: "neon",
-        protocol: "storage",
-        type: "integration",
-      },
-      { access: "private", type: "blob" },
-    ]);
-    expect(
-      JSON.parse(deployButton?.searchParams.get("connect") ?? "null")
-    ).toEqual([
-      {
-        env: "LINQ_CONNECTOR",
-        triggerPath: "/eve/v1/linq",
-        triggers: true,
-        type: "linq",
-      },
-    ]);
-    expect(blobSetup).toContain(
-      "vercel blob create-store open-instinct-images --access private --yes"
-    );
-    expect(blobSetup).toContain("BLOB_STORE_ID");
-    expect(blobSetup).toContain("BLOB_READ_WRITE_TOKEN");
-    expect(blobSetup).toContain("VERCEL_OIDC_TOKEN");
-    expect(blobSetup).toContain("persistent per-user memory");
-    expect(blobSetup).toContain("Production conversations require it");
-    expect(blobSetup).not.toContain("vercel env pull");
-    expect(
-      blobSetup?.match(/^pnpm exec vercel blob create-store .+$/gmu)
-    ).toHaveLength(1);
+    expect(readme).toContain("Local ODS `llama-server`");
+    expect(readme).toContain("The same local Qwen model");
+    expect(readme).toContain("Kernel cloud browser");
+    expect(readme).toContain("OpenTelemetry export is disabled");
+    expect(readme).not.toContain("vercel.com/new/clone");
   });
 });

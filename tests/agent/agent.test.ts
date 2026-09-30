@@ -1,20 +1,14 @@
 import type { DynamicResolveContext } from "eve";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { isScheduledAgentRunLeaseActive } from "@db/services/scheduled-agent-run-leases";
-import type { getGatewayModel } from "@db/services/settings";
 
 const services = vi.hoisted(() => ({
-  getModel: vi.fn<typeof getGatewayModel>(),
   isActive: vi.fn<typeof isScheduledAgentRunLeaseActive>(),
 }));
 
 vi.mock("@db/services/scheduled-agent-run-leases", () => ({
   isScheduledAgentRunLeaseActive: services.isActive,
 }));
-vi.mock("@db/services/settings", () => ({
-  getGatewayModel: services.getModel,
-}));
-
 import agent from "@agent/agent";
 
 const runId = "00000000-0000-4000-8000-000000000001";
@@ -23,7 +17,6 @@ const retryLeaseToken = "00000000-0000-4000-8000-000000000003";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  services.getModel.mockResolvedValue("openai/gpt-5.6-sol-fast");
 });
 
 describe("root agent model resolution", () => {
@@ -32,7 +25,7 @@ describe("root agent model resolution", () => {
       return leaseToken === retryLeaseToken;
     });
 
-    const model = await agent.model.events["step.started"]?.(
+    const selection = await agent.model.events["step.started"]?.(
       {},
       scheduledWorkerContext()
     );
@@ -41,11 +34,13 @@ describe("root agent model resolution", () => {
       runId,
       retryLeaseToken
     );
-    expect(services.getModel).toHaveBeenCalledExactlyOnceWith({
-      userId: "user-1",
-      workspaceId: "workspace-1",
+    expect(selection).toMatchObject({
+      modelContextWindowTokens: 65_536,
+      reasoning: "low",
     });
-    expect(model).toBe("openai/gpt-5.6-sol-fast");
+    expect(selection?.model).toMatchObject({
+      modelId: "/models/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf",
+    });
   });
 
   it("rejects a scheduled worker after its lease is replaced", async () => {
@@ -54,7 +49,6 @@ describe("root agent model resolution", () => {
     await expect(
       agent.model.events["step.started"]?.({}, scheduledWorkerContext())
     ).rejects.toThrow("The scheduled run lease is no longer active.");
-    expect(services.getModel).not.toHaveBeenCalled();
   });
 });
 

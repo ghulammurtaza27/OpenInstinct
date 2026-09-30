@@ -15,7 +15,7 @@ const image = {
 
 const mocks = vi.hoisted(() => ({
   captureScreenshot: vi.fn(),
-  del: vi.fn(),
+  deleteLocalArtifact: vi.fn(),
   deleteFile: vi.fn(),
   fetch: vi.fn(),
   mask: vi.fn(),
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
   reserve: vi.fn(),
   retrieve: vi.fn(),
-  put: vi.fn(),
+  writeLocalArtifact: vi.fn(),
   requireOwnedBrowserSession: vi.fn(),
   requireWorkerScope: vi.fn(),
 }));
@@ -42,9 +42,9 @@ vi.mock("@db/services/browser-images", () => ({
   finalizeBrowserImageArtifact: mocks.persist,
   reserveBrowserImageArtifact: mocks.reserve,
 }));
-vi.mock("@vercel/blob", () => ({
-  del: mocks.del,
-  put: mocks.put,
+vi.mock("@shared/local-storage/artifacts", () => ({
+  deleteLocalArtifact: mocks.deleteLocalArtifact,
+  writeLocalArtifact: mocks.writeLocalArtifact,
 }));
 vi.mock("@agent/subagents/browser-agent/lib/kernel", () => ({
   kernel: {
@@ -76,8 +76,8 @@ beforeEach(() => {
   });
   mocks.reserve.mockResolvedValue({ reservation, status: "pending" });
   mocks.persist.mockResolvedValue({ image, storagePathname: "stored/image" });
-  mocks.del.mockResolvedValue(undefined);
-  mocks.put.mockResolvedValue({ pathname: "stored/image" });
+  mocks.deleteLocalArtifact.mockResolvedValue(undefined);
+  mocks.writeLocalArtifact.mockResolvedValue(undefined);
   mocks.mask.mockImplementation(
     async (
       _sessionId: string,

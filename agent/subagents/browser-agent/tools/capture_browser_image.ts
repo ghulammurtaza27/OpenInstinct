@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { del, put } from "@vercel/blob";
 import { defineTool, toolOutput } from "eve/tools";
 import { z } from "zod";
 import { requireWorkerScope } from "@agent/subagents/browser-agent/lib/access";
@@ -15,8 +14,11 @@ import {
   maximumBrowserImageBytes,
   sniffBrowserImageMediaType,
 } from "@shared/browser/artifact";
-import { env } from "@shared/environment";
 import { kernel } from "@agent/subagents/browser-agent/lib/kernel";
+import {
+  deleteLocalArtifact,
+  writeLocalArtifact,
+} from "@shared/local-storage/artifacts";
 
 const regionSchema = z.object({
   height: z.number().int().positive(),
@@ -298,19 +300,8 @@ async function persistCapturedImage(
     throw new Error("The captured resource is not a supported browser image.");
   const contentHash = createHash("sha256").update(input.bytes).digest("hex");
   const storagePathname = `${reservation.storagePathname}/${contentHash}`;
-  if (!env.BLOB_STORE_ID && !env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("Browser image storage is not configured.");
-  }
-
-  await put(storagePathname, Buffer.from(input.bytes), {
-    access: "private",
-    abortSignal: signal,
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 30 * 24 * 60 * 60,
-    contentType: mediaType,
-    maximumSizeInBytes: maximumBrowserImageBytes,
-  });
+  signal?.throwIfAborted();
+  await writeLocalArtifact(storagePathname, input.bytes);
   try {
     const finalized = await finalizeBrowserImageArtifact(scope, reservation, {
       byteSize: input.bytes.byteLength,
@@ -321,11 +312,11 @@ async function persistCapturedImage(
       storagePathname,
     });
     if (finalized.storagePathname !== storagePathname) {
-      await del(storagePathname).catch(() => undefined);
+      await deleteLocalArtifact(storagePathname);
     }
     return finalized.image;
   } catch (error) {
-    await del(storagePathname).catch(() => undefined);
+    await deleteLocalArtifact(storagePathname);
     throw error;
   }
 }
